@@ -26,34 +26,22 @@ position:fixed;
 top:18px;
 left:18px;
 color:#fff;
-font-size:26px;
+font-size:22px;
 font-weight:bold;
 text-shadow:0 0 10px #6cf;
 z-index:20;
 }
 
-#controls{
+button.shop{
 position:fixed;
-bottom:18px;
-width:100%;
-display:flex;
-justify-content:space-between;
-padding:0 24px;
-box-sizing:border-box;
+top:60px;
+left:18px;
+padding:10px 14px;
+border:none;
+border-radius:10px;
+background:#fff;
+cursor:pointer;
 z-index:20;
-}
-
-.ctrl{
-width:78px;
-height:78px;
-border-radius:50%;
-background:rgba(255,255,255,.18);
-display:flex;
-align-items:center;
-justify-content:center;
-font-size:34px;
-color:#fff;
-user-select:none;
 }
 
 #gameover{
@@ -70,23 +58,47 @@ z-index:30;
 
 #gameover button{
 padding:14px 26px;
-font-size:20px;
+font-size:18px;
 border:none;
-border-radius:14px;
-margin-top:12px;
+border-radius:12px;
+margin-top:10px;
 cursor:pointer;
+}
+
+#controls{
+position:fixed;
+bottom:18px;
+width:100%;
+display:flex;
+justify-content:space-between;
+padding:0 24px;
+box-sizing:border-box;
+z-index:20;
+}
+
+.ctrl{
+width:70px;
+height:70px;
+border-radius:50%;
+background:rgba(255,255,255,.2);
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:30px;
+color:#fff;
 }
 </style>
 </head>
 
 <body>
 
-<div id="hud">Баллы: 0</div>
+<div id="hud">Баллы: 0 | 💰 Баланс: 0</div>
+
+<button class="shop" onclick="openShop()">🛒 Магазин</button>
 
 <div id="gameover">
 <h1>Game Over</h1>
 <div id="finalscore"></div>
-
 <button onclick="restartGame()">Играть снова</button>
 <button onclick="sendScoreToBot()">Вернуться в бот</button>
 </div>
@@ -110,6 +122,7 @@ resize();
 addEventListener("resize",resize);
 
 let score=0;
+let balance=0;
 let running=true;
 
 const gravity=0.32;
@@ -129,7 +142,7 @@ mario.src="mario.png";
 let platforms=[];
 let coins=[];
 
-// ===== МЕНЬШЕ ПЛАТФОРМ =====
+// ===== СПАВН =====
 function createLevel(){
 
 platforms=[];
@@ -142,11 +155,12 @@ w:260,
 h:20
 });
 
-// было 8 → стало 4
+let lastY=560;
+
 for(let i=1;i<5;i++){
 
 let x=Math.random()*(canvas.width-180);
-let y=560-(i*170);
+let y=lastY-170;
 
 platforms.push({
 x:x,
@@ -155,36 +169,32 @@ w:180,
 h:18
 });
 
+// коин строго над платформой
 coins.push({
 x:x+90,
 y:y-30,
 taken:false
 });
+
+lastY=y;
 }
 }
 
 createLevel();
 
-// ===== РИСОВАНИЕ =====
+// ===== DRAW =====
 function drawPlatform(p){
 ctx.fillStyle="#6b7dff";
-ctx.shadowBlur=10;
-ctx.shadowColor="#7aa2ff";
-
 ctx.fillRect(p.x,p.y,p.w,p.h);
-ctx.shadowBlur=0;
 }
 
 function drawCoins(){
 for(let c of coins){
 if(c.taken) continue;
-
 ctx.beginPath();
 ctx.arc(c.x,c.y,10,0,Math.PI*2);
 ctx.fillStyle="gold";
 ctx.fill();
-ctx.strokeStyle="white";
-ctx.stroke();
 }
 }
 
@@ -192,7 +202,7 @@ function drawPlayer(){
 ctx.drawImage(mario,player.x-65,player.y-72,130,92);
 }
 
-// ===== ЛОГИКА =====
+// ===== UPDATE =====
 function update(){
 
 if(!running) return;
@@ -201,7 +211,6 @@ player.vy+=gravity;
 player.y+=player.vy;
 player.x+=player.vx;
 
-// края
 if(player.x<0) player.x=canvas.width;
 if(player.x>canvas.width) player.x=0;
 
@@ -210,7 +219,7 @@ for(let p of platforms){
 if(
 player.vy>0 &&
 player.y+player.r>p.y &&
-player.y+player.r<p.y+24 &&
+player.y+player.r<p.y+20 &&
 player.x>p.x-10 &&
 player.x<p.x+p.w+10
 ){
@@ -226,7 +235,10 @@ Math.abs(player.y-c.y)<32
 ){
 c.taken=true;
 score++;
-document.getElementById("hud").innerHTML="Баллы: "+score;
+balance++;
+
+document.getElementById("hud").innerHTML=
+`Баллы: ${score} | 💰 Баланс: ${balance}`;
 }
 }
 
@@ -243,10 +255,8 @@ p.x=Math.random()*(canvas.width-180);
 }
 }
 
-// ===== ФИКС КОИНОВ =====
 for(let c of coins){
 c.y+=diff;
-
 if(c.y>canvas.height){
 c.y=-50;
 c.x=Math.random()*(canvas.width-180);
@@ -255,25 +265,18 @@ c.taken=false;
 }
 }
 
-// проигрыш
 if(player.y>canvas.height+120){
 gameOver();
 }
 }
 
-// ===== РЕНДЕР =====
-function render(){
-ctx.clearRect(0,0,canvas.width,canvas.height);
-
-for(let p of platforms) drawPlatform(p);
-drawCoins();
-drawPlayer();
-}
-
 // ===== LOOP =====
 function loop(){
 update();
-render();
+ctx.clearRect(0,0,canvas.width,canvas.height);
+platforms.forEach(drawPlatform);
+drawCoins();
+drawPlayer();
 requestAnimationFrame(loop);
 }
 loop();
@@ -281,14 +284,20 @@ loop();
 // ===== GAME OVER =====
 function gameOver(){
 running=false;
-document.getElementById("finalscore").innerHTML="Баллы: "+score;
+document.getElementById("finalscore").innerText=
+"Баллы: "+score;
+
 document.getElementById("gameover").style.display="flex";
 }
 
 // ===== RESTART =====
 function restartGame(){
 score=0;
-document.getElementById("hud").innerHTML="Баллы: 0";
+balance=0;
+
+document.getElementById("hud").innerHTML=
+"Баллы: 0 | 💰 Баланс: 0";
+
 document.getElementById("gameover").style.display="none";
 
 player.x=canvas.width/2;
@@ -305,22 +314,35 @@ function sendScoreToBot(){
 if(window.Telegram && Telegram.WebApp){
 
 Telegram.WebApp.sendData(
-JSON.stringify({score:score})
+JSON.stringify({score:score,balance:balance})
 );
 
 Telegram.WebApp.close();
 
 } else {
-alert("Открой игру через Telegram");
+alert("Открой в Telegram");
 }
 }
 
-// ===== CONTROL =====
+// ===== SHOP =====
+function openShop(){
+alert(
+"🛒 МАГАЗИН\n\n" +
+"💰 Баланс: " + balance + "\n\n" +
+"50 💰 — скидка 5%\n" +
+"100 💰 — +ГБ интернета\n" +
+"80 💰 — бонусные минуты\n" +
+"120 💰 — Kino 7 дней\n" +
+"70 💰 — приоритетная поддержка\n\n" +
+"🎬 Kino: https://www.kinopoisk.ru/"
+);
+}
+
+// ===== CONTROLS =====
 addEventListener("keydown",e=>{
 if(e.key==="ArrowLeft") player.vx=-5;
 if(e.key==="ArrowRight") player.vx=5;
 });
-
 addEventListener("keyup",()=>player.vx=0);
 
 document.getElementById("left").ontouchstart=()=>player.vx=-5;

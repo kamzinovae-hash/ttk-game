@@ -1,3 +1,7 @@
+<!-- =========================================
+🎮 TTK JUMP — FINAL STABLE VERSION
+========================================= -->
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -5,212 +9,165 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>TTK Jump</title>
 
-<!-- =========================
-🤖 TELEGRAM WEBAPP API
-========================= -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
 
-/* =========================
-🎨 ОСНОВНОЙ СТИЛЬ
-========================= */
+/* ===== ТВОЙ КРАСИВЫЙ ФОН ===== */
 html,body{
 margin:0;
-padding:0;
 overflow:hidden;
 font-family:Arial;
-background:#000;
+background:url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover;
 }
 
-/* =========================
-📊 HUD (баллы + баланс)
-========================= */
+/* ===== HUD ===== */
 #hud{
 position:fixed;
-top:10px;
-left:10px;
+top:18px;
+left:18px;
 color:white;
-font-size:20px;
+font-size:24px;
+font-weight:bold;
+text-shadow:0 0 10px #6cf;
 z-index:10;
 }
 
-/* =========================
-🎮 CANVAS
-========================= */
+/* ===== CANVAS ===== */
 canvas{
 display:block;
-background:linear-gradient(#111,#222);
 }
 
-/* =========================
-🎮 КНОПКИ УПРАВЛЕНИЯ
-========================= */
+/* ===== КНОПКИ ===== */
 #controls{
 position:fixed;
-bottom:10px;
+bottom:18px;
 width:100%;
 display:flex;
 justify-content:space-between;
-padding:0 20px;
+padding:0 24px;
 }
 
 .btn{
-width:70px;
-height:70px;
+width:75px;
+height:75px;
 border-radius:50%;
-background:rgba(255,255,255,0.2);
-color:white;
+background:rgba(255,255,255,.18);
 display:flex;
 align-items:center;
 justify-content:center;
-font-size:30px;
-}
-
-/* =========================
-💀 GAME OVER
-========================= */
-#gameover{
-display:none;
-position:fixed;
-inset:0;
-background:rgba(0,0,0,0.8);
 color:white;
-justify-content:center;
-align-items:center;
-flex-direction:column;
+font-size:32px;
 }
-
-button{
-padding:10px 20px;
-margin-top:10px;
-border:none;
-border-radius:10px;
-}
-
 </style>
 </head>
 
 <body>
 
-<!-- =========================
-📊 HUD
-========================= -->
-<div id="hud">
-⭐ Баллы: 0 | 💰 Баланс: 0
-</div>
-
-<!-- =========================
-🎮 CANVAS
-========================= -->
+<div id="hud">Баллы: 0</div>
 <canvas id="game"></canvas>
 
-<!-- =========================
-💀 GAME OVER
-========================= -->
-<div id="gameover">
-<h1>Game Over</h1>
-<div id="final"></div>
-
-<button onclick="restart()">🔁 Играть снова</button>
-<button onclick="send()">📤 В бот</button>
-</div>
-
-<!-- =========================
-🎮 КНОПКИ
-========================= -->
 <div id="controls">
-<div class="btn" onclick="left()">◀</div>
-<div class="btn" onclick="right()">▶</div>
+<div class="btn" id="left">◀</div>
+<div class="btn" id="right">▶</div>
 </div>
 
 <script>
 
-/* =========================
-🧠 TELEGRAM API
-========================= */
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-/* =========================
-🎮 CANVAS
-========================= */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 
-/* =========================
-📊 ДАННЫЕ ИГРЫ
-========================= */
 let score = 0;
 let balance = 0;
-let running = true;
 
-/* =========================
-🧍 ИГРОК
-========================= */
-let player = {
-x:100,
-y:400,
-vx:0,
-vy:0
-};
+const player = {x:200,y:400,vx:0,vy:0};
 
-/* =========================
-🧱 ПЛАТФОРМЫ
-========================= */
+const gravity = 0.35;
+const jump = -12;
+
 let platforms = [];
+let coins = [];
 
 function create(){
 platforms = [];
+coins = [];
 
 for(let i=0;i<6;i++){
-platforms.push({
-x:Math.random()*300,
-y:i*120+100,
-w:120,
-h:10
-});
+let x = Math.random()*300;
+let y = 500 - i*120;
+
+platforms.push({x,y,w:120,h:15});
+coins.push({x:x+50,y:y-20,taken:false});
 }
 }
 create();
 
-/* =========================
-🎨 РИСОВАНИЕ
-========================= */
 function draw(){
+
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
 ctx.fillStyle="white";
 ctx.fillRect(player.x,player.y,30,30);
 
-ctx.fillStyle="blue";
+ctx.fillStyle="#6b7dff";
 platforms.forEach(p=>{
+ctx.shadowBlur=10;
+ctx.shadowColor="#7aa2ff";
 ctx.fillRect(p.x,p.y,p.w,p.h);
+ctx.shadowBlur=0;
+});
+
+ctx.fillStyle="gold";
+coins.forEach(c=>{
+if(!c.taken){
+ctx.beginPath();
+ctx.arc(c.x,c.y,10,0,Math.PI*2);
+ctx.fill();
+}
 });
 }
 
-/* =========================
-🧠 ЛОГИКА
-========================= */
 function update(){
 
-if(!running) return;
+player.vy += gravity;
+player.y += player.vy;
+player.x += player.vx;
 
-player.y += 2;
+platforms.forEach(p=>{
+if(player.vy>0 &&
+player.y+30>=p.y &&
+player.y+30<=p.y+10 &&
+player.x>p.x &&
+player.x<p.x+p.w){
+player.vy = jump;
+score++;
+balance++;
+document.getElementById("hud").innerText="Баллы: "+score;
+}
+});
 
-/* падение */
-if(player.y>canvas.height){
-gameOver();
+coins.forEach(c=>{
+if(!c.taken &&
+Math.abs(player.x-c.x)<20 &&
+Math.abs(player.y-c.y)<20){
+c.taken=true;
+score++;
+balance++;
+}
+});
+
+if(player.y>innerHeight){
+tg.sendData(JSON.stringify({score,balance}));
+tg.close();
+}
 }
 
-}
-
-/* =========================
-🔁 LOOP
-========================= */
 function loop(){
 update();
 draw();
@@ -218,61 +175,9 @@ requestAnimationFrame(loop);
 }
 loop();
 
-/* =========================
-🎮 УПРАВЛЕНИЕ
-========================= */
-function left(){ player.x -= 20; }
-function right(){ player.x += 20; }
-
-/* =========================
-💀 GAME OVER
-========================= */
-function gameOver(){
-running = false;
-
-document.getElementById("gameover").style.display="flex";
-document.getElementById("final").innerText=
-"⭐ Баллы: " + score;
-}
-
-/* =========================
-🔁 RESTART
-========================= */
-function restart(){
-score = 0;
-balance = 0;
-running = true;
-
-player.x=100;
-player.y=400;
-
-document.getElementById("gameover").style.display="none";
-updateHUD();
-create();
-}
-
-/* =========================
-📊 HUD
-========================= */
-function updateHUD(){
-document.getElementById("hud").innerText=
-`⭐ Баллы: ${score} | 💰 Баланс: ${balance}`;
-}
-
-/* =========================
-📤 ОТПРАВКА В БОТ
-========================= */
-function send(){
-
-tg.sendData(JSON.stringify({
-score:score,
-balance:balance
-}));
-
-tg.close();
-}
+document.getElementById("left").onclick=()=>player.vx=-5;
+document.getElementById("right").onclick=()=>player.vx=5;
 
 </script>
-
 </body>
 </html>

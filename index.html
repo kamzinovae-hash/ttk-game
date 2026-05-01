@@ -8,10 +8,6 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
-
-/* =========================
-🎨 ОСНОВНОЙ СТИЛЬ ИГРЫ
-========================= */
 html,body{
 margin:0;
 padding:0;
@@ -20,60 +16,46 @@ font-family:Arial,sans-serif;
 background:url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover;
 }
 
-/* =========================
-📊 HUD (баллы + баланс)
-========================= */
+canvas{
+display:block;
+touch-action:none;
+}
+
 #hud{
 position:fixed;
 top:18px;
 left:18px;
 color:#fff;
-font-size:22px;
+font-size:26px;
 font-weight:bold;
 text-shadow:0 0 10px #6cf;
 z-index:20;
 }
 
-/* =========================
-🛒 КНОПКИ МЕНЮ
-========================= */
-button.shop{
+#controls{
 position:fixed;
-top:60px;
-left:18px;
-padding:10px 14px;
-border:none;
-border-radius:10px;
-background:#fff;
-cursor:pointer;
+bottom:18px;
+width:100%;
+display:flex;
+justify-content:space-between;
+padding:0 24px;
+box-sizing:border-box;
 z-index:20;
 }
 
-/* =========================
-🎁 БОНУС МЕНЮ (НОВОЕ)
-========================= */
-#shopPanel{
-display:none;
-position:fixed;
-inset:0;
-background:rgba(0,0,0,0.85);
-color:white;
-z-index:50;
-padding:20px;
-box-sizing:border-box;
+.ctrl{
+width:78px;
+height:78px;
+border-radius:50%;
+background:rgba(255,255,255,.18);
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:34px;
+color:#fff;
+user-select:none;
 }
 
-.shop-item{
-background:rgba(255,255,255,0.1);
-padding:10px;
-margin:8px 0;
-border-radius:10px;
-cursor:pointer;
-}
-
-/* =========================
-💀 GAME OVER
-========================= */
 #gameover{
 display:none;
 position:fixed;
@@ -86,74 +68,37 @@ color:#fff;
 z-index:30;
 }
 
+#gameover button{
+padding:14px 26px;
+font-size:20px;
+border:none;
+border-radius:14px;
+margin-top:12px;
+cursor:pointer;
+}
 </style>
 </head>
 
 <body>
 
-<!-- =========================
-📊 HUD
-========================= -->
-<div id="hud">Баллы: 0 | 💰 Баланс: 0</div>
+<div id="hud">Баллы: 0</div>
 
-<!-- =========================
-🛒 КНОПКА МАГАЗИНА
-========================= -->
-<button class="shop" onclick="openShop()">🛒 Магазин</button>
-
-<!-- =========================
-🎁 БОНУС МАГАЗИН (НОВЫЙ UI)
-========================= -->
-<div id="shopPanel">
-
-<h2>🎁 БОНУСЫ</h2>
-
-<div id="balanceText"></div>
-
-<!-- =========================
-💰 БОНУСЫ (выбор вручную)
-========================= -->
-<div class="shop-item" onclick="buy('discount')">💸 Скидка 5% — 50</div>
-<div class="shop-item" onclick="buy('gb')">📶 +ГБ интернета — 100</div>
-<div class="shop-item" onclick="buy('minutes')">📞 Минуты — 80</div>
-<div class="shop-item" onclick="buy('kino')">🎬 Kino 7 дней — 120</div>
-<div class="shop-item" onclick="buy('support')">⚡ Приоритет — 70</div>
-
-<br>
-
-<!-- =========================
-🎬 КИНО ССЫЛКА
-========================= -->
-<a href="https://www.kinopoisk.ru/" target="_blank" style="color:#6cf;">
-🎬 Онлайн кинотеатр
-</a>
-
-<br><br>
-
-<button onclick="closeShop()">❌ Закрыть</button>
-
-</div>
-
-<!-- =========================
-🎮 CANVAS
-========================= -->
-<canvas id="game"></canvas>
-
-<!-- =========================
-💀 GAME OVER
-========================= -->
 <div id="gameover">
 <h1>Game Over</h1>
 <div id="finalscore"></div>
+
 <button onclick="restartGame()">Играть снова</button>
-<button onclick="sendScoreToBot()">В бот</button>
+<button onclick="sendScoreToBot()">Вернуться в бот</button>
 </div>
 
-<script>
+<div id="controls">
+<div class="ctrl" id="left">◀</div>
+<div class="ctrl" id="right">▶</div>
+</div>
 
-/* =========================
-🎮 ИГРОВЫЕ ДАННЫЕ
-========================= */
+<canvas id="game"></canvas>
+
+<script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 
@@ -165,12 +110,11 @@ resize();
 addEventListener("resize",resize);
 
 let score=0;
-let balance=0;
 let running=true;
 
-/* =========================
-🧍 ИГРОК
-========================= */
+const gravity=0.32;
+const jumpPower=-13;
+
 const player={
 x:canvas.width/2,
 y:500,
@@ -179,18 +123,13 @@ vy:0,
 r:28
 };
 
-const gravity=0.32;
-const jumpPower=-13;
+const mario=new Image();
+mario.src="mario.png";
 
-/* =========================
-🧱 ОБЪЕКТЫ
-========================= */
 let platforms=[];
 let coins=[];
 
-/* =========================
-🧱 УРОВЕНЬ
-========================= */
+// ===== МЕНЬШЕ ПЛАТФОРМ =====
 function createLevel(){
 
 platforms=[];
@@ -203,105 +142,57 @@ w:260,
 h:20
 });
 
-let lastY=560;
-
+// было 8 → стало 4
 for(let i=1;i<5;i++){
 
 let x=Math.random()*(canvas.width-180);
-let y=lastY-170;
+let y=560-(i*170);
 
-platforms.push({x,y,w:180,h:18});
+platforms.push({
+x:x,
+y:y,
+w:180,
+h:18
+});
 
 coins.push({
 x:x+90,
 y:y-30,
 taken:false
 });
+}
+}
 
-lastY=y;
-}
-}
 createLevel();
 
-/* =========================
-🎁 ОТКРЫТЬ МАГАЗИН
-========================= */
-function openShop(){
-document.getElementById("shopPanel").style.display="block";
-updateShop();
-}
-
-function closeShop(){
-document.getElementById("shopPanel").style.display="none";
-}
-
-/* =========================
-💰 ОБНОВЛЕНИЕ МАГАЗИНА
-========================= */
-function updateShop(){
-document.getElementById("balanceText").innerHTML=
-"💰 Баланс: "+balance;
-}
-
-/* =========================
-🛒 ПОКУПКИ
-========================= */
-function buy(type){
-
-let price={
-discount:50,
-gb:100,
-minutes:80,
-kino:120,
-support:70
-};
-
-if(balance<price[type]){
-alert("❌ Недостаточно баллов");
-return;
-}
-
-balance-=price[type];
-
-/* 🎬 бонус кино */
-if(type==="kino"){
-window.open("https://www.kinopoisk.ru/","_blank");
-}
-
-updateHUD();
-updateShop();
-
-alert("✅ Куплено: "+type);
-}
-
-/* =========================
-🎨 РЕНДЕР
-========================= */
-function draw(){
-
-ctx.clearRect(0,0,canvas.width,canvas.height);
-
+// ===== РИСОВАНИЕ =====
+function drawPlatform(p){
 ctx.fillStyle="#6b7dff";
-platforms.forEach(p=>{
-ctx.fillRect(p.x,p.y,p.w,p.h);
-});
+ctx.shadowBlur=10;
+ctx.shadowColor="#7aa2ff";
 
-ctx.fillStyle="gold";
-coins.forEach(c=>{
-if(!c.taken){
+ctx.fillRect(p.x,p.y,p.w,p.h);
+ctx.shadowBlur=0;
+}
+
+function drawCoins(){
+for(let c of coins){
+if(c.taken) continue;
+
 ctx.beginPath();
 ctx.arc(c.x,c.y,10,0,Math.PI*2);
+ctx.fillStyle="gold";
 ctx.fill();
+ctx.strokeStyle="white";
+ctx.stroke();
 }
-});
-
-ctx.fillStyle="red";
-ctx.fillRect(player.x,player.y,30,30);
 }
 
-/* =========================
-🧠 ЛОГИКА
-========================= */
+function drawPlayer(){
+ctx.drawImage(mario,player.x-65,player.y-72,130,92);
+}
+
+// ===== ЛОГИКА =====
 function update(){
 
 if(!running) return;
@@ -310,85 +201,133 @@ player.vy+=gravity;
 player.y+=player.vy;
 player.x+=player.vx;
 
-/* сбор коинов */
-coins.forEach(c=>{
+// края
+if(player.x<0) player.x=canvas.width;
+if(player.x>canvas.width) player.x=0;
+
+// платформы
+for(let p of platforms){
+if(
+player.vy>0 &&
+player.y+player.r>p.y &&
+player.y+player.r<p.y+24 &&
+player.x>p.x-10 &&
+player.x<p.x+p.w+10
+){
+player.vy=jumpPower;
+}
+}
+
+// коины
+for(let c of coins){
 if(!c.taken &&
-Math.abs(player.x-c.x)<25 &&
-Math.abs(player.y-c.y)<25
+Math.abs(player.x-c.x)<32 &&
+Math.abs(player.y-c.y)<32
 ){
 c.taken=true;
 score++;
-balance++;
-updateHUD();
+document.getElementById("hud").innerHTML="Баллы: "+score;
 }
-});
 }
 
-/* =========================
-📊 HUD
-========================= */
-function updateHUD(){
-document.getElementById("hud").innerText=
-`Баллы: ${score} | 💰 ${balance}`;
+// скролл
+if(player.y<canvas.height*0.35){
+let diff=canvas.height*0.35-player.y;
+player.y=canvas.height*0.35;
+
+for(let p of platforms){
+p.y+=diff;
+if(p.y>canvas.height){
+p.y=-80;
+p.x=Math.random()*(canvas.width-180);
+}
 }
 
-/* =========================
-🔁 LOOP
-========================= */
+// ===== ФИКС КОИНОВ =====
+for(let c of coins){
+c.y+=diff;
+
+if(c.y>canvas.height){
+c.y=-50;
+c.x=Math.random()*(canvas.width-180);
+c.taken=false;
+}
+}
+}
+
+// проигрыш
+if(player.y>canvas.height+120){
+gameOver();
+}
+}
+
+// ===== РЕНДЕР =====
+function render(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+for(let p of platforms) drawPlatform(p);
+drawCoins();
+drawPlayer();
+}
+
+// ===== LOOP =====
 function loop(){
 update();
-draw();
+render();
 requestAnimationFrame(loop);
 }
 loop();
 
-/* =========================
-💀 GAME OVER
-========================= */
+// ===== GAME OVER =====
 function gameOver(){
 running=false;
+document.getElementById("finalscore").innerHTML="Баллы: "+score;
 document.getElementById("gameover").style.display="flex";
-document.getElementById("finalscore").innerText="Баллы: "+score;
 }
 
-/* =========================
-🔄 RESTART
-========================= */
+// ===== RESTART =====
 function restartGame(){
 score=0;
-balance=0;
-running=true;
+document.getElementById("hud").innerHTML="Баллы: 0";
+document.getElementById("gameover").style.display="none";
 
 player.x=canvas.width/2;
 player.y=500;
 player.vy=0;
 
-updateHUD();
+running=true;
 createLevel();
-
-document.getElementById("gameover").style.display="none";
 }
 
-/* =========================
-📤 TELEGRAM
-========================= */
+// ===== SEND SCORE =====
 function sendScoreToBot(){
+
+if(window.Telegram && Telegram.WebApp){
+
 Telegram.WebApp.sendData(
-JSON.stringify({score,balance})
+JSON.stringify({score:score})
 );
+
 Telegram.WebApp.close();
+
+} else {
+alert("Открой игру через Telegram");
+}
 }
 
-/* =========================
-🎮 УПРАВЛЕНИЕ
-========================= */
+// ===== CONTROL =====
 addEventListener("keydown",e=>{
 if(e.key==="ArrowLeft") player.vx=-5;
 if(e.key==="ArrowRight") player.vx=5;
 });
+
 addEventListener("keyup",()=>player.vx=0);
 
-</script>
+document.getElementById("left").ontouchstart=()=>player.vx=-5;
+document.getElementById("right").ontouchstart=()=>player.vx=5;
+document.getElementById("left").ontouchend=()=>player.vx=0;
+document.getElementById("right").ontouchend=()=>player.vx=0;
 
+</script>
 </body>
 </html>

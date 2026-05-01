@@ -1,173 +1,321 @@
 <!-- =========================================
-🎮 TTK JUMP — FINAL STABLE VERSION
+🎮 TTK JUMP — FINAL (YOUR DESIGN + FIXED LOGIC)
 ========================================= -->
 
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport"
+content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no">
+
 <title>TTK Jump</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
 
-/* ===== ТВОЙ КРАСИВЫЙ ФОН ===== */
+/* =========================================
+🎨 ТВОЙ ДИЗАЙН (НЕ ТРОГАЕМ)
+========================================= */
+
 html,body{
 margin:0;
+padding:0;
 overflow:hidden;
-font-family:Arial;
+touch-action:none;
 background:url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover;
+font-family:Arial;
+}
+
+canvas{
+display:block;
 }
 
 /* ===== HUD ===== */
 #hud{
 position:fixed;
-top:18px;
-left:18px;
-color:white;
+top:14px;
+left:14px;
 font-size:24px;
 font-weight:bold;
+color:white;
 text-shadow:0 0 10px #6cf;
 z-index:10;
-}
-
-/* ===== CANVAS ===== */
-canvas{
-display:block;
 }
 
 /* ===== КНОПКИ ===== */
 #controls{
 position:fixed;
 bottom:18px;
+left:0;
 width:100%;
 display:flex;
 justify-content:space-between;
-padding:0 24px;
+padding:0 25px;
+box-sizing:border-box;
+z-index:20;
 }
 
-.btn{
-width:75px;
-height:75px;
+.ctrl{
+width:76px;
+height:76px;
 border-radius:50%;
-background:rgba(255,255,255,.18);
+background:rgba(255,255,255,.16);
 display:flex;
 align-items:center;
 justify-content:center;
+font-size:30px;
 color:white;
-font-size:32px;
+user-select:none;
 }
+
+/* ===== GAME OVER ===== */
+#gameover{
+display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.75);
+align-items:center;
+justify-content:center;
+flex-direction:column;
+color:white;
+z-index:30;
+}
+
+#gameover button{
+padding:14px 28px;
+font-size:20px;
+border:none;
+border-radius:14px;
+margin-top:18px;
+}
+
 </style>
 </head>
 
 <body>
 
+<!-- ===== HUD ===== -->
 <div id="hud">Баллы: 0</div>
-<canvas id="game"></canvas>
 
-<div id="controls">
-<div class="btn" id="left">◀</div>
-<div class="btn" id="right">▶</div>
+<!-- ===== GAME OVER ===== -->
+<div id="gameover">
+<h1>Game Over</h1>
+<div id="finalscore"></div>
+<button onclick="restartGame()">Играть снова</button>
 </div>
+
+<!-- ===== CONTROLS ===== -->
+<div id="controls">
+<div class="ctrl" id="left">◀</div>
+<div class="ctrl" id="right">▶</div>
+</div>
+
+<canvas id="game"></canvas>
 
 <script>
 
+/* =========================================
+🎮 TELEGRAM
+========================================= */
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+/* =========================================
+🎮 CANVAS
+========================================= */
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
 
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+function resize(){
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+}
+resize();
+addEventListener("resize",resize);
 
-let score = 0;
-let balance = 0;
+/* =========================================
+🎮 ИГРА
+========================================= */
 
-const player = {x:200,y:400,vx:0,vy:0};
+let score=0;
+let running=true;
 
-const gravity = 0.35;
-const jump = -12;
+const gravity=0.30;
+const jumpPower=-11;
 
-let platforms = [];
-let coins = [];
+const PLAYER_W=95;
+const PLAYER_H=70;
 
-function create(){
-platforms = [];
-coins = [];
+const PLATFORM_W=140;
+const PLATFORM_H=14;
 
-for(let i=0;i<6;i++){
-let x = Math.random()*300;
-let y = 500 - i*120;
+const GAP_Y=95;
 
-platforms.push({x,y,w:120,h:15});
-coins.push({x:x+50,y:y-20,taken:false});
+/* ===== PLAYER ===== */
+const player={
+x:canvas.width/2,
+y:canvas.height-160,
+vx:0,
+vy:0,
+r:18
+};
+
+/* ===== IMAGE ===== */
+const mario=new Image();
+mario.src="mario.png";
+
+/* ===== OBJECTS ===== */
+let platforms=[];
+let coins=[];
+
+/* =========================================
+🧱 LEVEL
+========================================= */
+function createLevel(){
+
+platforms=[];
+coins=[];
+
+platforms.push({
+x:canvas.width/2-PLATFORM_W/2,
+y:canvas.height-80,
+w:PLATFORM_W,
+h:PLATFORM_H
+});
+
+for(let i=1;i<10;i++){
+
+let x=Math.random()*(canvas.width-PLATFORM_W);
+let y=canvas.height-80-(i*GAP_Y);
+
+platforms.push({
+x,y,w:PLATFORM_W,h:PLATFORM_H
+});
+
+coins.push({
+x:x+PLATFORM_W/2,
+y:y-22,
+taken:false
+});
 }
 }
-create();
 
+createLevel();
+
+/* =========================================
+🎨 DRAW
+========================================= */
 function draw(){
 
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
-ctx.fillStyle="white";
-ctx.fillRect(player.x,player.y,30,30);
-
-ctx.fillStyle="#6b7dff";
+/* platforms */
 platforms.forEach(p=>{
 ctx.shadowBlur=10;
-ctx.shadowColor="#7aa2ff";
+ctx.shadowColor="#7797ff";
+ctx.fillStyle="#6575ff";
 ctx.fillRect(p.x,p.y,p.w,p.h);
 ctx.shadowBlur=0;
 });
 
-ctx.fillStyle="gold";
-coins.forEach(c=>{
-if(!c.taken){
+/* coins */
+for(let c of coins){
+if(c.taken) continue;
+
 ctx.beginPath();
-ctx.arc(c.x,c.y,10,0,Math.PI*2);
+ctx.arc(c.x,c.y,8,0,Math.PI*2);
+ctx.fillStyle="gold";
 ctx.fill();
-}
-});
+ctx.strokeStyle="white";
+ctx.stroke();
 }
 
+/* player */
+ctx.drawImage(
+mario,
+player.x-PLAYER_W/2,
+player.y-PLAYER_H/2,
+PLAYER_W,
+PLAYER_H
+);
+}
+
+/* =========================================
+🧠 UPDATE
+========================================= */
 function update(){
 
-player.vy += gravity;
-player.y += player.vy;
-player.x += player.vx;
+if(!running) return;
+
+player.vy+=gravity;
+player.y+=player.vy;
+player.x+=player.vx;
+
+/* wrap */
+if(player.x<0) player.x=canvas.width;
+if(player.x>canvas.width) player.x=0;
+
+/* platforms */
+for(let p of platforms){
+if(
+player.vy>0 &&
+player.y+player.r>p.y &&
+player.y+player.r<p.y+18 &&
+player.x>p.x &&
+player.x<p.x+p.w
+){
+player.vy=jumpPower;
+}
+}
+
+/* coins */
+for(let c of coins){
+if(!c.taken &&
+Math.abs(player.x-c.x)<24 &&
+Math.abs(player.y-c.y)<24
+){
+c.taken=true;
+score++;
+document.getElementById("hud").innerText="Баллы: "+score;
+}
+}
+
+/* scroll */
+if(player.y<canvas.height*0.38){
+
+let diff=canvas.height*0.38-player.y;
+player.y=canvas.height*0.38;
 
 platforms.forEach(p=>{
-if(player.vy>0 &&
-player.y+30>=p.y &&
-player.y+30<=p.y+10 &&
-player.x>p.x &&
-player.x<p.x+p.w){
-player.vy = jump;
-score++;
-balance++;
-document.getElementById("hud").innerText="Баллы: "+score;
+p.y+=diff;
+if(p.y>canvas.height){
+p.y=-40;
+p.x=Math.random()*(canvas.width-PLATFORM_W);
 }
 });
 
 coins.forEach(c=>{
-if(!c.taken &&
-Math.abs(player.x-c.x)<20 &&
-Math.abs(player.y-c.y)<20){
-c.taken=true;
-score++;
-balance++;
+c.y+=diff;
+if(c.y>canvas.height){
+let p=platforms[Math.floor(Math.random()*platforms.length)];
+c.x=p.x+PLATFORM_W/2;
+c.y=p.y-22;
+c.taken=false;
 }
 });
+}
 
-if(player.y>innerHeight){
-tg.sendData(JSON.stringify({score,balance}));
-tg.close();
+/* lose */
+if(player.y>canvas.height+80){
+gameOver();
 }
 }
 
+/* =========================================
+🔁 LOOP
+========================================= */
 function loop(){
 update();
 draw();
@@ -175,8 +323,46 @@ requestAnimationFrame(loop);
 }
 loop();
 
-document.getElementById("left").onclick=()=>player.vx=-5;
-document.getElementById("right").onclick=()=>player.vx=5;
+/* =========================================
+💀 GAME OVER
+========================================= */
+function gameOver(){
+running=false;
+document.getElementById("finalscore").innerText="Баллы: "+score;
+document.getElementById("gameover").style.display="flex";
+}
+
+/* =========================================
+🔄 RESTART
+========================================= */
+function restartGame(){
+score=0;
+document.getElementById("hud").innerText="Баллы: 0";
+
+player.x=canvas.width/2;
+player.y=canvas.height-160;
+player.vy=0;
+
+running=true;
+createLevel();
+
+document.getElementById("gameover").style.display="none";
+}
+
+/* =========================================
+🎮 CONTROLS
+========================================= */
+addEventListener("keydown",e=>{
+if(e.key==="ArrowLeft") player.vx=-4;
+if(e.key==="ArrowRight") player.vx=4;
+});
+
+addEventListener("keyup",()=>player.vx=0);
+
+document.getElementById("left").ontouchstart=()=>player.vx=-4;
+document.getElementById("right").ontouchstart=()=>player.vx=4;
+document.getElementById("left").ontouchend=()=>player.vx=0;
+document.getElementById("right").ontouchend=()=>player.vx=0;
 
 </script>
 </body>

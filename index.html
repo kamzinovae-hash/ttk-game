@@ -1,333 +1,151 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TTK Jump</title>
+# =========================================
+# 🤖 TELEGRAM BOT SYSTEM (TTK PROJECT)
+# AIogram 3.x
+# =========================================
 
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.filters import Command
+import asyncio
+import json
 
-<style>
-html,body{
-margin:0;
-padding:0;
-overflow:hidden;
-font-family:Arial,sans-serif;
-background:url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover;
-}
+# =========================================
+# 🔑 ТОКЕН БОТА
+# =========================================
+TOKEN = "ВСТАВЬ_ТОКЕН_СЮДА"
 
-canvas{
-display:block;
-touch-action:none;
-}
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
 
-#hud{
-position:fixed;
-top:18px;
-left:18px;
-color:#fff;
-font-size:26px;
-font-weight:bold;
-text-shadow:0 0 10px #6cf;
-z-index:20;
-}
+# =========================================
+# 🧠 ПАМЯТЬ ПОЛЬЗОВАТЕЛЕЙ (баллы)
+# =========================================
+users = {}
 
-#controls{
-position:fixed;
-bottom:18px;
-width:100%;
-display:flex;
-justify-content:space-between;
-padding:0 24px;
-box-sizing:border-box;
-z-index:20;
-}
+def get_user(user_id: int):
+    if user_id not in users:
+        users[user_id] = {
+            "score": 0,
+            "balance": 0,
+            "bonuses": []
+        }
+    return users[user_id]
 
-.ctrl{
-width:78px;
-height:78px;
-border-radius:50%;
-background:rgba(255,255,255,.18);
-display:flex;
-align-items:center;
-justify-content:center;
-font-size:34px;
-color:#fff;
-user-select:none;
-}
+# =========================================
+# 📋 ГЛАВНОЕ МЕНЮ
+# =========================================
+main_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📄 Профиль")],
+        [KeyboardButton(text="🧾 Заявки")],
+        [KeyboardButton(text="🎁 Бонусы")],
+        [KeyboardButton(text="🎮 Играть")]
+    ],
+    resize_keyboard=True
+)
 
-#gameover{
-display:none;
-position:fixed;
-inset:0;
-background:rgba(0,0,0,.75);
-align-items:center;
-justify-content:center;
-flex-direction:column;
-color:#fff;
-z-index:30;
-}
+# =========================================
+# 🚀 START
+# =========================================
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    get_user(message.from_user.id)
 
-#gameover button{
-padding:14px 26px;
-font-size:20px;
-border:none;
-border-radius:14px;
-margin-top:12px;
-cursor:pointer;
-}
-</style>
-</head>
+    await message.answer(
+        "🎮 TTK SYSTEM\nВыберите раздел:",
+        reply_markup=main_menu
+    )
 
-<body>
+# =========================================
+# 📄 ПРОФИЛЬ
+# =========================================
+@dp.message(lambda m: m.text == "📄 Профиль")
+async def profile(message: types.Message):
+    user = get_user(message.from_user.id)
 
-<div id="hud">Баллы: 0</div>
+    await message.answer(
+        f"👤 Профиль\n\n"
+        f"⭐ Баллы: {user['score']}\n"
+        f"💰 Баланс: {user['balance']}\n"
+        f"🎁 Бонусов: {len(user['bonuses'])}"
+    )
 
-<div id="gameover">
-<h1>Game Over</h1>
-<div id="finalscore"></div>
+# =========================================
+# 🧾 ЗАЯВКИ
+# =========================================
+@dp.message(lambda m: m.text == "🧾 Заявки")
+async def tickets(message: types.Message):
+    await message.answer(
+        "🧾 Поддержка:\n"
+        "• Ошибки\n"
+        "• Вопросы\n"
+        "• Обращения"
+    )
 
-<button onclick="restartGame()">Играть снова</button>
-<button onclick="sendScoreToBot()">Вернуться в бот</button>
-</div>
+# =========================================
+# 🎁 БОНУСЫ
+# =========================================
+@dp.message(lambda m: m.text == "🎁 Бонусы")
+async def bonuses(message: types.Message):
+    user = get_user(message.from_user.id)
 
-<div id="controls">
-<div class="ctrl" id="left">◀</div>
-<div class="ctrl" id="right">▶</div>
-</div>
+    await message.answer(
+        "🎁 МАГАЗИН БОНУСОВ\n\n"
+        "💸 Скидка 5% — 50💰\n"
+        "📶 +ГБ интернета — 100💰\n"
+        "📞 Минуты — 80💰\n"
+        "🎬 Kino 7 дней — 120💰\n"
+        "⚡ Приоритет — 70💰\n\n"
+        f"💰 Ваш баланс: {user['balance']}"
+    )
 
-<canvas id="game"></canvas>
+# =========================================
+# 🎮 ИГРА (WEBAPP)
+# =========================================
+@dp.message(lambda m: m.text == "🎮 Играть")
+async def game(message: types.Message):
+    kb = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(
+            text="▶ Играть",
+            web_app=types.WebAppInfo(
+                url="https://kamzinovae-hash.github.io/ttk-game/"
+            )
+        )]
+    ])
 
-<script>
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
+    await message.answer("Запуск игры:", reply_markup=kb)
 
-function resize(){
-canvas.width=innerWidth;
-canvas.height=innerHeight;
-}
-resize();
-addEventListener("resize",resize);
+# =========================================
+# 📥 ПРИЁМ ДАННЫХ ИЗ ИГРЫ
+# =========================================
+@dp.message()
+async def game_data(message: types.Message):
+    try:
+        data = json.loads(message.text)
 
-let score=0;
-let running=true;
+        user = get_user(message.from_user.id)
 
-const gravity=0.32;
-const jumpPower=-13;
+        score = data.get("score", 0)
+        balance = data.get("balance", 0)
 
-const player={
-x:canvas.width/2,
-y:500,
-vx:0,
-vy:0,
-r:28
-};
+        # 💰 обновляем данные
+        user["score"] = score
+        user["balance"] += balance
 
-const mario=new Image();
-mario.src="mario.png";
+        await message.answer(
+            f"🎮 Результат принят!\n"
+            f"⭐ +{score} очков\n"
+            f"💰 +{balance} баллов"
+        )
 
-let platforms=[];
-let coins=[];
+    except:
+        pass
 
-// ===== МЕНЬШЕ ПЛАТФОРМ =====
-function createLevel(){
+# =========================================
+# 🔁 ЗАПУСК
+# =========================================
+async def main():
+    await dp.start_polling(bot)
 
-platforms=[];
-coins=[];
-
-platforms.push({
-x:canvas.width/2-130,
-y:560,
-w:260,
-h:20
-});
-
-// было 8 → стало 4
-for(let i=1;i<5;i++){
-
-let x=Math.random()*(canvas.width-180);
-let y=560-(i*170);
-
-platforms.push({
-x:x,
-y:y,
-w:180,
-h:18
-});
-
-coins.push({
-x:x+90,
-y:y-30,
-taken:false
-});
-}
-}
-
-createLevel();
-
-// ===== РИСОВАНИЕ =====
-function drawPlatform(p){
-ctx.fillStyle="#6b7dff";
-ctx.shadowBlur=10;
-ctx.shadowColor="#7aa2ff";
-
-ctx.fillRect(p.x,p.y,p.w,p.h);
-ctx.shadowBlur=0;
-}
-
-function drawCoins(){
-for(let c of coins){
-if(c.taken) continue;
-
-ctx.beginPath();
-ctx.arc(c.x,c.y,10,0,Math.PI*2);
-ctx.fillStyle="gold";
-ctx.fill();
-ctx.strokeStyle="white";
-ctx.stroke();
-}
-}
-
-function drawPlayer(){
-ctx.drawImage(mario,player.x-65,player.y-72,130,92);
-}
-
-// ===== ЛОГИКА =====
-function update(){
-
-if(!running) return;
-
-player.vy+=gravity;
-player.y+=player.vy;
-player.x+=player.vx;
-
-// края
-if(player.x<0) player.x=canvas.width;
-if(player.x>canvas.width) player.x=0;
-
-// платформы
-for(let p of platforms){
-if(
-player.vy>0 &&
-player.y+player.r>p.y &&
-player.y+player.r<p.y+24 &&
-player.x>p.x-10 &&
-player.x<p.x+p.w+10
-){
-player.vy=jumpPower;
-}
-}
-
-// коины
-for(let c of coins){
-if(!c.taken &&
-Math.abs(player.x-c.x)<32 &&
-Math.abs(player.y-c.y)<32
-){
-c.taken=true;
-score++;
-document.getElementById("hud").innerHTML="Баллы: "+score;
-}
-}
-
-// скролл
-if(player.y<canvas.height*0.35){
-let diff=canvas.height*0.35-player.y;
-player.y=canvas.height*0.35;
-
-for(let p of platforms){
-p.y+=diff;
-if(p.y>canvas.height){
-p.y=-80;
-p.x=Math.random()*(canvas.width-180);
-}
-}
-
-// ===== ФИКС КОИНОВ =====
-for(let c of coins){
-c.y+=diff;
-
-if(c.y>canvas.height){
-c.y=-50;
-c.x=Math.random()*(canvas.width-180);
-c.taken=false;
-}
-}
-}
-
-// проигрыш
-if(player.y>canvas.height+120){
-gameOver();
-}
-}
-
-// ===== РЕНДЕР =====
-function render(){
-ctx.clearRect(0,0,canvas.width,canvas.height);
-
-for(let p of platforms) drawPlatform(p);
-drawCoins();
-drawPlayer();
-}
-
-// ===== LOOP =====
-function loop(){
-update();
-render();
-requestAnimationFrame(loop);
-}
-loop();
-
-// ===== GAME OVER =====
-function gameOver(){
-running=false;
-document.getElementById("finalscore").innerHTML="Баллы: "+score;
-document.getElementById("gameover").style.display="flex";
-}
-
-// ===== RESTART =====
-function restartGame(){
-score=0;
-document.getElementById("hud").innerHTML="Баллы: 0";
-document.getElementById("gameover").style.display="none";
-
-player.x=canvas.width/2;
-player.y=500;
-player.vy=0;
-
-running=true;
-createLevel();
-}
-
-// ===== SEND SCORE =====
-function sendScoreToBot(){
-
-if(window.Telegram && Telegram.WebApp){
-
-Telegram.WebApp.sendData(
-JSON.stringify({score:score})
-);
-
-Telegram.WebApp.close();
-
-} else {
-alert("Открой игру через Telegram");
-}
-}
-
-// ===== CONTROL =====
-addEventListener("keydown",e=>{
-if(e.key==="ArrowLeft") player.vx=-5;
-if(e.key==="ArrowRight") player.vx=5;
-});
-
-addEventListener("keyup",()=>player.vx=0);
-
-document.getElementById("left").ontouchstart=()=>player.vx=-5;
-document.getElementById("right").ontouchstart=()=>player.vx=5;
-document.getElementById("left").ontouchend=()=>player.vx=0;
-document.getElementById("right").ontouchend=()=>player.vx=0;
-
-</script>
-</body>
-</html>
+if __name__ == "__main__":
+    asyncio.run(main())

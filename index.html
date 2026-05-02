@@ -3,44 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TTK Jump</title>
+    <title>TTK Jump — Original</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        html, body {
-            margin: 0; padding: 0; overflow: hidden;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: #000; /* Черный фон пока грузится картинка */
-        }
-        canvas {
-            display: block;
-            /* Фон - гифка */
-            background: url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover;
-        }
-        #hud {
-            position: fixed; top: 10px; left: 10px;
-            color: #fff; font-size: 18px; font-weight: bold;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.7); z-index: 10;
-        }
-        #gameover {
-            display: none; position: fixed; inset: 0;
-            background: rgba(0,0,0,0.8);
-            flex-direction: column; align-items: center; justify-content: center;
-            color: #fff; z-index: 100; text-align: center;
-        }
-        .btn {
-            padding: 12px 24px; font-size: 18px; border: none;
-            border-radius: 20px; margin: 10px; cursor: pointer; font-weight: bold;
-        }
-        #controls {
-            position: fixed; bottom: 10px; width: 100%;
-            display: flex; justify-content: space-between; padding: 0 20px;
-            box-sizing: border-box;
-        }
-        .ctrl-btn {
-            width: 70px; height: 70px; background: rgba(255,255,255,0.3);
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 24px; color: #fff; user-select: none;
-        }
+        html, body { margin: 0; padding: 0; overflow: hidden; background: #000; }
+        canvas { display: block; background: url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover; }
+        #hud { position: fixed; top: 15px; left: 15px; color: #fff; font-size: 20px; font-weight: bold; text-shadow: 2px 2px 5px #000; z-index: 10; }
+        #gameover { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; color: #fff; z-index: 100; }
+        .btn { padding: 15px 30px; font-size: 18px; border: none; border-radius: 25px; margin: 10px; cursor: pointer; font-weight: bold; }
+        #controls { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; }
+        .ctrl-btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #fff; user-select: none; }
     </style>
 </head>
 <body>
@@ -48,10 +20,10 @@
 <div id="hud">Баллы: 0 | 💰 Монеты: 0</div>
 
 <div id="gameover">
-    <h1>Game Over</h1>
-    <div id="finalscore" style="font-size: 20px; margin-bottom: 20px;"></div>
-    <button class="btn" style="background: #4CAF50; color: white;" onclick="restartGame()">Играть снова</button>
-    <button class="btn" style="background: #f44336; color: white;" onclick="sendScoreToBot()">Выйти</button>
+    <h1 style="color: #ff4d4d; font-size: 40px;">GAME OVER</h1>
+    <div id="finalscore" style="font-size: 24px; margin-bottom: 20px;"></div>
+    <button class="btn" style="background: #4CAF50; color: white;" onclick="restartGame()">ИГРАТЬ СНОВА</button>
+    <button class="btn" style="background: #2196F3; color: white;" onclick="sendScoreToBot()">ВЕРНУТЬСЯ В БОТ</button>
 </div>
 
 <div id="controls">
@@ -65,59 +37,50 @@
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     const tg = window.Telegram.WebApp;
-
-    tg.expand(); // Развернуть игру
-    tg.ready();
+    tg.expand();
 
     let score = 0;
     let balance = 0;
     let running = true;
-    const gravity = 0.4;
-    const jumpPower = -12;
+    const gravity = 0.35;
+    const jumpPower = -13;
 
-    // --- НАСТРОЙКИ ИГРОКА (МАРИО) ---
-    // Чтобы Марио не был растянутым, мы используем один радиус для коллизий.
-    const player = {
-        x: canvas.width / 2,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        r: 20 // Радиус игрока (круг)
-    };
+    // Параметры игрока
+    const player = { x: 0, y: 0, vx: 0, vy: 0, w: 60, h: 60 };
+    const marioImg = new Image();
+    marioImg.src = "https://kamzinovae-hash.github.io/ttk-game/mario.png"; // Убедись, что файл лежит в корне репозитория
 
     let platforms = [];
     let coins = [];
 
     function init() {
-        // Адаптируем размер canvas под экран
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        
-        player.x = canvas.width / 2;
+        player.x = canvas.width / 2 - player.w / 2;
         player.y = canvas.height - 150;
         player.vy = 0;
-        
+        createLevel();
+    }
+
+    function createLevel() {
         platforms = [];
         coins = [];
-        
-        // Начальная платформа
-        platforms.push({ x: canvas.width/2 - 60, y: canvas.height - 50, w: 120, h: 10 });
-        
-        // Генерируем уровень
-        let lastY = canvas.height - 50;
+        let y = canvas.height - 60;
+        // Первая платформа под ногами
+        platforms.push({ x: canvas.width / 2 - 80, y: y, w: 160, h: 15 });
+
         for (let i = 0; i < 7; i++) {
-            lastY -= 120;
-            spawnPlatform(lastY);
+            y -= 160;
+            spawnPlatform(y);
         }
     }
 
     function spawnPlatform(y) {
-        let w = 100;
+        let w = 130;
         let x = Math.random() * (canvas.width - w);
-        platforms.push({ x: x, y: y, w: w, h: 10 });
-        // Монетка над платформой
-        if (Math.random() > 0.4) {
-            coins.push({ x: x + w/2, y: y - 25, taken: false });
+        platforms.push({ x: x, y: y, w: w, h: 15 });
+        if (Math.random() > 0.3) {
+            coins.push({ x: x + w / 2, y: y - 35, taken: false });
         }
     }
 
@@ -128,90 +91,87 @@
         player.y += player.vy;
         player.x += player.vx;
 
-        // Края экрана
-        if (player.x < 0) player.x = canvas.width;
-        if (player.x > canvas.width) player.x = 0;
+        // Бесконечный экран по бокам
+        if (player.x + player.w < 0) player.x = canvas.width;
+        if (player.x > canvas.width) player.x = -player.w;
 
-        // Проверка столкновений с платформами
-        platforms.forEach(p => {
-            if (player.vy > 0 && // Падаем вниз
-                player.y + player.r > p.y && // Ноги ниже верха платформы
-                player.y + player.r < p.y + p.h + 10 && // Ноги не слишком глубоко
-                player.x > p.x && player.x < p.x + p.w // Находимся над платформой
-            ) {
-                player.vy = jumpPower; // Прыжок
-            }
-        });
+        // Коллизия с платформами (только при падении)
+        if (player.vy > 0) {
+            platforms.forEach(p => {
+                if (player.y + player.h > p.y && 
+                    player.y + player.h < p.y + p.h + 15 &&
+                    player.x + player.w > p.x && 
+                    player.x < p.x + p.w) {
+                    player.vy = jumpPower;
+                }
+            });
+        }
 
         // Сбор монет
         coins.forEach(c => {
-            if (!c.taken && Math.abs(player.x - c.x) < 25 && Math.abs(player.y - c.y) < 25) {
+            if (!c.taken && Math.abs(player.x + player.w/2 - c.x) < 30 && Math.abs(player.y + player.h/2 - c.y) < 30) {
                 c.taken = true;
                 score += 10;
-                balance += 1; // 1 монета за коин
+                balance += 1;
                 document.getElementById("hud").innerText = `Баллы: ${score} | 💰 Монеты: ${balance}`;
             }
         });
 
-        // Скролл экрана
-        if (player.y < canvas.height / 2) {
-            let diff = canvas.height / 2 - player.y;
-            player.y = canvas.height / 2;
-            
+        // Скролл вверх
+        if (player.y < canvas.height * 0.4) {
+            let diff = canvas.height * 0.4 - player.y;
+            player.y = canvas.height * 0.4;
             platforms.forEach(p => {
                 p.y += diff;
                 if (p.y > canvas.height) {
-                    p.y = -10;
-                    p.x = Math.random() * (canvas.width - 100);
+                    p.y = -20;
+                    p.x = Math.random() * (canvas.width - 130);
                 }
             });
             coins.forEach(c => {
                 c.y += diff;
                 if (c.y > canvas.height) {
-                    c.y = -40; c.x = Math.random() * canvas.width; c.taken = false;
+                    c.taken = false;
+                    c.y = -50;
+                    c.x = Math.random() * canvas.width;
                 }
             });
         }
 
-        // Game Over
-        if (player.y > canvas.height + 50) gameOver();
+        if (player.y > canvas.height + 100) gameOver();
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Рисуем платформы
-        ctx.fillStyle = "#4caf50";
-        platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+        // Платформы
+        ctx.fillStyle = "#6B7DFF";
+        platforms.forEach(p => {
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+        });
 
-        // Рисуем монеты
+        // Монеты
         ctx.fillStyle = "gold";
         coins.forEach(c => {
             if (!c.taken) {
                 ctx.beginPath();
-                ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
+                ctx.arc(c.x, c.y, 10, 0, Math.PI * 2);
                 ctx.fill();
             }
         });
 
-        // --- РИСУЕМ ИГРОКА (ИСПРАВЛЕНО) ---
-        // Используем простой красный круг, чтобы он не был растянутым.
-        ctx.fillStyle = "#f44336"; // Красный цвет
-        ctx.beginPath();
-        ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Если вам ВАЖНО вернуть картинку Марио, уберите код выше и используйте этот:
-        // const img = new Image(); img.src = 'mario.png';
-        // if (img.complete) {
-        //    // Рисуем, сохраняя пропорции (квадрат 40x40 вокруг центра игрока)
-        //    ctx.drawImage(img, player.x - 20, player.y - 20, 40, 40);
-        // }
+        // Марио (рисуем строго квадратом, чтобы не растягивался)
+        if (marioImg.complete) {
+            ctx.drawImage(marioImg, player.x, player.y, player.w, player.h);
+        } else {
+            ctx.fillStyle = "red";
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+        }
     }
 
     function gameOver() {
         running = false;
-        document.getElementById("finalscore").innerText = `Набрано: ${score} баллов`;
+        document.getElementById("finalscore").innerText = `Счет: ${score}`;
         document.getElementById("gameover").style.display = "flex";
     }
 
@@ -224,31 +184,26 @@
     }
 
     function sendScoreToBot() {
-        // Создаем JSON объект с данными
-        const dataInfo = JSON.stringify({
-            score: score,
-            balance: balance
-        });
-        
-        // Отправляем данные боту (РАБОТАЕТ ТОЛЬКО ПРИ ЗАПУСКЕ ИЗ ОСНОВНОГО МЕНЮ)
-        tg.sendData(dataInfo);
-        tg.close();
+        tg.sendData(JSON.stringify({ score: score, balance: balance }));
     }
 
     // Управление
-    document.getElementById("btnLeft").ontouchstart = () => player.vx = -6;
-    document.getElementById("btnLeft").ontouchend = () => player.vx = 0;
-    document.getElementById("btnRight").ontouchstart = () => player.vx = 6;
-    document.getElementById("btnRight").ontouchend = () => player.vx = 0;
+    const btnLeft = document.getElementById("btnLeft");
+    const btnRight = document.getElementById("btnRight");
 
-    function gameLoop() {
+    btnLeft.ontouchstart = (e) => { e.preventDefault(); player.vx = -6; };
+    btnRight.ontouchstart = (e) => { e.preventDefault(); player.vx = 6; };
+    btnLeft.ontouchend = () => { player.vx = 0; };
+    btnRight.ontouchend = () => { player.vx = 0; };
+
+    function loop() {
         update();
         draw();
-        requestAnimationFrame(gameLoop);
+        requestAnimationFrame(loop);
     }
 
     init();
-    gameLoop();
+    loop();
 </script>
 </body>
 </html>

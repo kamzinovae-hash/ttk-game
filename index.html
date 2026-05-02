@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TTK Jump — Original</title>
+    <title>TTK Jump — Optimized</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         html, body { margin: 0; padding: 0; overflow: hidden; background: #000; }
         canvas { display: block; background: url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover; }
         #hud { position: fixed; top: 15px; left: 15px; color: #fff; font-size: 20px; font-weight: bold; text-shadow: 2px 2px 5px #000; z-index: 10; }
-        #gameover { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; color: #fff; z-index: 100; }
-        .btn { padding: 15px 30px; font-size: 18px; border: none; border-radius: 25px; margin: 10px; cursor: pointer; font-weight: bold; }
+        #gameover { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; color: #fff; z-index: 100; font-family: sans-serif; }
+        .btn { padding: 15px 30px; font-size: 18px; border: none; border-radius: 25px; margin: 10px; cursor: pointer; font-weight: bold; font-family: sans-serif; }
         #controls { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; }
-        .ctrl-btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #fff; user-select: none; }
+        .ctrl-btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #fff; user-select: none; -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
 <body>
@@ -20,7 +20,7 @@
 <div id="hud">Баллы: 0 | 💰 Монеты: 0</div>
 
 <div id="gameover">
-    <h1 style="color: #ff4d4d; font-size: 40px;">GAME OVER</h1>
+    <h1 style="color: #ff4d4d; font-size: 40px; margin-bottom: 10px;">GAME OVER</h1>
     <div id="finalscore" style="font-size: 24px; margin-bottom: 20px;"></div>
     <button class="btn" style="background: #4CAF50; color: white;" onclick="restartGame()">ИГРАТЬ СНОВА</button>
     <button class="btn" style="background: #2196F3; color: white;" onclick="sendScoreToBot()">ВЕРНУТЬСЯ В БОТ</button>
@@ -42,13 +42,21 @@
     let score = 0;
     let balance = 0;
     let running = true;
-    const gravity = 0.35;
-    const jumpPower = -13;
+    const gravity = 0.38;
+    const jumpPower = -14;
 
-    // Параметры игрока
-    const player = { x: 0, y: 0, vx: 0, vy: 0, w: 60, h: 60 };
+    // Параметры Марио (Широкий и крепкий)
+    const player = { 
+        x: 0, 
+        y: 0, 
+        vx: 0, 
+        vy: 0, 
+        w: 80, // Ширина увеличена
+        h: 60  // Высота уменьшена для эффекта "в ширину"
+    };
+
     const marioImg = new Image();
-    marioImg.src = "https://kamzinovae-hash.github.io/ttk-game/mario.png"; // Убедись, что файл лежит в корне репозитория
+    marioImg.src = "mario.png"; // Убедись, что файл mario.png лежит в той же папке на GitHub
 
     let platforms = [];
     let coins = [];
@@ -66,21 +74,31 @@
         platforms = [];
         coins = [];
         let y = canvas.height - 60;
-        // Первая платформа под ногами
-        platforms.push({ x: canvas.width / 2 - 80, y: y, w: 160, h: 15 });
+        
+        // Стартовая платформа
+        platforms.push({ x: canvas.width / 2 - 80, y: y, w: 160, h: 18 });
 
-        for (let i = 0; i < 7; i++) {
-            y -= 160;
+        // Генерация начальных плит с нормальным расстоянием
+        for (let i = 0; i < 6; i++) {
+            y -= 170; // Расстояние между плитами
             spawnPlatform(y);
         }
     }
 
     function spawnPlatform(y) {
-        let w = 130;
+        let w = 120;
         let x = Math.random() * (canvas.width - w);
-        platforms.push({ x: x, y: y, w: w, h: 15 });
-        if (Math.random() > 0.3) {
-            coins.push({ x: x + w / 2, y: y - 35, taken: false });
+        let newPlatform = { x: x, y: y, w: w, h: 18 };
+        platforms.push(newPlatform);
+
+        // Коин привязан СТРОГО к платформе (центр плиты)
+        if (Math.random() > 0.4) {
+            coins.push({ 
+                x: x + w / 2, 
+                y: y - 30, // Чуть выше плиты
+                taken: false,
+                parent: newPlatform // Привязка к объекту плиты
+            });
         }
     }
 
@@ -91,17 +109,16 @@
         player.y += player.vy;
         player.x += player.vx;
 
-        // Бесконечный экран по бокам
         if (player.x + player.w < 0) player.x = canvas.width;
         if (player.x > canvas.width) player.x = -player.w;
 
-        // Коллизия с платформами (только при падении)
+        // Прыжок от плит
         if (player.vy > 0) {
             platforms.forEach(p => {
                 if (player.y + player.h > p.y && 
                     player.y + player.h < p.y + p.h + 15 &&
-                    player.x + player.w > p.x && 
-                    player.x < p.x + p.w) {
+                    player.x + player.w > p.x + 10 && 
+                    player.x < p.x + p.w - 10) {
                     player.vy = jumpPower;
                 }
             });
@@ -109,7 +126,9 @@
 
         // Сбор монет
         coins.forEach(c => {
-            if (!c.taken && Math.abs(player.x + player.w/2 - c.x) < 30 && Math.abs(player.y + player.h/2 - c.y) < 30) {
+            if (!c.taken && 
+                Math.abs(player.x + player.w/2 - c.x) < 40 && 
+                Math.abs(player.y + player.h/2 - c.y) < 40) {
                 c.taken = true;
                 score += 10;
                 balance += 1;
@@ -117,23 +136,36 @@
             }
         });
 
-        // Скролл вверх
-        if (player.y < canvas.height * 0.4) {
-            let diff = canvas.height * 0.4 - player.y;
-            player.y = canvas.height * 0.4;
+        // Скролл (двигаем мир вниз)
+        if (player.y < canvas.height * 0.45) {
+            let diff = canvas.height * 0.45 - player.y;
+            player.y = canvas.height * 0.45;
+
             platforms.forEach(p => {
                 p.y += diff;
                 if (p.y > canvas.height) {
-                    p.y = -20;
-                    p.x = Math.random() * (canvas.width - 130);
+                    // Переносим плиту наверх
+                    p.y = platforms.reduce((min, plat) => Math.min(min, plat.y), canvas.height) - 170;
+                    p.x = Math.random() * (canvas.width - 120);
+                    
+                    // Обновляем коин для этой плиты
+                    let coin = coins.find(c => c.parent === p);
+                    if (coin) {
+                        coin.taken = false;
+                        coin.x = p.x + p.w / 2;
+                        coin.y = p.y - 30;
+                    } else if (Math.random() > 0.5) {
+                        // Если у плиты не было коина, можем создать новый
+                        coins.push({ x: p.x + p.w/2, y: p.y - 30, taken: false, parent: p });
+                    }
                 }
             });
+
+            // Синхронизируем положение всех коинов с их плитами
             coins.forEach(c => {
-                c.y += diff;
-                if (c.y > canvas.height) {
-                    c.taken = false;
-                    c.y = -50;
-                    c.x = Math.random() * canvas.width;
+                if (c.parent) {
+                    c.y = c.parent.y - 30;
+                    c.x = c.parent.x + c.parent.w / 2;
                 }
             });
         }
@@ -144,34 +176,41 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Платформы
-        ctx.fillStyle = "#6B7DFF";
+        // Платформы (красивый цвет)
+        ctx.fillStyle = "#5dade2";
         platforms.forEach(p => {
+            ctx.roundRect ? ctx.beginPath() : null; // Для красоты если браузер тянет
             ctx.fillRect(p.x, p.y, p.w, p.h);
         });
 
         // Монеты
-        ctx.fillStyle = "gold";
+        ctx.fillStyle = "#f1c40f";
         coins.forEach(c => {
             if (!c.taken) {
                 ctx.beginPath();
-                ctx.arc(c.x, c.y, 10, 0, Math.PI * 2);
+                ctx.arc(c.x, c.y, 12, 0, Math.PI * 2);
                 ctx.fill();
+                // Блик на монетке
+                ctx.fillStyle = "white";
+                ctx.beginPath();
+                ctx.arc(c.x - 4, c.y - 4, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#f1c40f";
             }
         });
 
-        // Марио (рисуем строго квадратом, чтобы не растягивался)
+        // Марио
         if (marioImg.complete) {
             ctx.drawImage(marioImg, player.x, player.y, player.w, player.h);
         } else {
-            ctx.fillStyle = "red";
+            ctx.fillStyle = "orange";
             ctx.fillRect(player.x, player.y, player.w, player.h);
         }
     }
 
     function gameOver() {
         running = false;
-        document.getElementById("finalscore").innerText = `Счет: ${score}`;
+        document.getElementById("finalscore").innerText = `Всего баллов: ${score}`;
         document.getElementById("gameover").style.display = "flex";
     }
 
@@ -188,13 +227,17 @@
     }
 
     // Управление
-    const btnLeft = document.getElementById("btnLeft");
-    const btnRight = document.getElementById("btnRight");
+    const bL = document.getElementById("btnLeft");
+    const bR = document.getElementById("btnRight");
 
-    btnLeft.ontouchstart = (e) => { e.preventDefault(); player.vx = -6; };
-    btnRight.ontouchstart = (e) => { e.preventDefault(); player.vx = 6; };
-    btnLeft.ontouchend = () => { player.vx = 0; };
-    btnRight.ontouchend = () => { player.vx = 0; };
+    const startLeft = (e) => { e.preventDefault(); player.vx = -7; };
+    const startRight = (e) => { e.preventDefault(); player.vx = 7; };
+    const stop = (e) => { e.preventDefault(); player.vx = 0; };
+
+    bL.addEventListener("touchstart", startLeft);
+    bR.addEventListener("touchstart", startRight);
+    bL.addEventListener("touchend", stop);
+    bR.addEventListener("touchend", stop);
 
     function loop() {
         update();

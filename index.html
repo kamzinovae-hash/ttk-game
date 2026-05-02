@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TTK Jump — Optimized</title>
+    <title>TTK Jump — Stable</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        html, body { margin: 0; padding: 0; overflow: hidden; background: #000; }
-        canvas { display: block; background: url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover; }
-        #hud { position: fixed; top: 15px; left: 15px; color: #fff; font-size: 20px; font-weight: bold; text-shadow: 2px 2px 5px #000; z-index: 10; }
-        #gameover { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; color: #fff; z-index: 100; font-family: sans-serif; }
-        .btn { padding: 15px 30px; font-size: 18px; border: none; border-radius: 25px; margin: 10px; cursor: pointer; font-weight: bold; font-family: sans-serif; }
-        #controls { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; }
-        .ctrl-btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #fff; user-select: none; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        canvas { display: block; background: #222 url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover; }
+        #hud { position: fixed; top: 15px; left: 15px; color: #fff; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; }
+        #gameover { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); flex-direction: column; align-items: center; justify-content: center; color: #fff; z-index: 100; }
+        .btn { padding: 15px 30px; font-size: 18px; border: none; border-radius: 30px; margin: 10px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        #controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; box-sizing: border-box; }
+        .ctrl-btn { width: 75px; height: 75px; background: rgba(255,255,255,0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #fff; user-select: none; -webkit-tap-highlight-color: transparent; border: 2px solid rgba(255,255,255,0.1); }
+        .ctrl-btn:active { background: rgba(255,255,255,0.4); }
     </style>
 </head>
 <body>
@@ -20,8 +21,8 @@
 <div id="hud">Баллы: 0 | 💰 Монеты: 0</div>
 
 <div id="gameover">
-    <h1 style="color: #ff4d4d; font-size: 40px; margin-bottom: 10px;">GAME OVER</h1>
-    <div id="finalscore" style="font-size: 24px; margin-bottom: 20px;"></div>
+    <h1 style="color: #ff4d4d; font-size: 45px; margin-bottom: 5px;">GAME OVER</h1>
+    <div id="finalscore" style="font-size: 22px; margin-bottom: 25px;"></div>
     <button class="btn" style="background: #4CAF50; color: white;" onclick="restartGame()">ИГРАТЬ СНОВА</button>
     <button class="btn" style="background: #2196F3; color: white;" onclick="sendScoreToBot()">ВЕРНУТЬСЯ В БОТ</button>
 </div>
@@ -42,21 +43,13 @@
     let score = 0;
     let balance = 0;
     let running = true;
-    const gravity = 0.38;
+    const gravity = 0.4;
     const jumpPower = -14;
 
-    // Параметры Марио (Широкий и крепкий)
-    const player = { 
-        x: 0, 
-        y: 0, 
-        vx: 0, 
-        vy: 0, 
-        w: 80, // Ширина увеличена
-        h: 60  // Высота уменьшена для эффекта "в ширину"
-    };
-
+    // Марио: Широкий и большой (80x60)
+    const player = { x: 0, y: 0, vx: 0, vy: 0, w: 80, h: 60 };
     const marioImg = new Image();
-    marioImg.src = "mario.png"; // Убедись, что файл mario.png лежит в той же папке на GitHub
+    marioImg.src = "mario.png"; 
 
     let platforms = [];
     let coins = [];
@@ -64,41 +57,36 @@
     function init() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        
         player.x = canvas.width / 2 - player.w / 2;
         player.y = canvas.height - 150;
+        player.vx = 0;
         player.vy = 0;
-        createLevel();
-    }
-
-    function createLevel() {
+        
         platforms = [];
         coins = [];
-        let y = canvas.height - 60;
-        
-        // Стартовая платформа
-        platforms.push({ x: canvas.width / 2 - 80, y: y, w: 160, h: 18 });
 
-        // Генерация начальных плит с нормальным расстоянием
+        // Стартовая площадка
+        platforms.push({ x: canvas.width/2 - 90, y: canvas.height - 60, w: 180, h: 20 });
+
+        // Генерация начальных платформ
+        let lastY = canvas.height - 60;
         for (let i = 0; i < 6; i++) {
-            y -= 170; // Расстояние между плитами
-            spawnPlatform(y);
+            lastY -= 180;
+            spawnPlatform(lastY);
         }
+        running = true;
     }
 
     function spawnPlatform(y) {
-        let w = 120;
+        let w = 130;
         let x = Math.random() * (canvas.width - w);
-        let newPlatform = { x: x, y: y, w: w, h: 18 };
-        platforms.push(newPlatform);
+        let p = { x: x, y: y, w: w, h: 18 };
+        platforms.push(p);
 
-        // Коин привязан СТРОГО к платформе (центр плиты)
+        // Привязываем монету к платформе
         if (Math.random() > 0.4) {
-            coins.push({ 
-                x: x + w / 2, 
-                y: y - 30, // Чуть выше плиты
-                taken: false,
-                parent: newPlatform // Привязка к объекту плиты
-            });
+            coins.push({ parent: p, taken: false });
         }
     }
 
@@ -109,10 +97,11 @@
         player.y += player.vy;
         player.x += player.vx;
 
+        // Телепорт через края экрана
         if (player.x + player.w < 0) player.x = canvas.width;
         if (player.x > canvas.width) player.x = -player.w;
 
-        // Прыжок от плит
+        // Столкновение с платформами
         if (player.vy > 0) {
             platforms.forEach(p => {
                 if (player.y + player.h > p.y && 
@@ -124,48 +113,34 @@
             });
         }
 
-        // Сбор монет
+        // Сбор монет (привязанных к родительской платформе)
         coins.forEach(c => {
-            if (!c.taken && 
-                Math.abs(player.x + player.w/2 - c.x) < 40 && 
-                Math.abs(player.y + player.h/2 - c.y) < 40) {
-                c.taken = true;
-                score += 10;
-                balance += 1;
-                document.getElementById("hud").innerText = `Баллы: ${score} | 💰 Монеты: ${balance}`;
+            if (!c.taken) {
+                let cx = c.parent.x + c.parent.w / 2;
+                let cy = c.parent.y - 30;
+                if (Math.abs(player.x + player.w/2 - cx) < 45 && 
+                    Math.abs(player.y + player.h/2 - cy) < 45) {
+                    c.taken = true;
+                    score += 10;
+                    balance += 1;
+                    document.getElementById("hud").innerText = `Баллы: ${score} | 💰 Монеты: ${balance}`;
+                }
             }
         });
 
-        // Скролл (двигаем мир вниз)
-        if (player.y < canvas.height * 0.45) {
-            let diff = canvas.height * 0.45 - player.y;
-            player.y = canvas.height * 0.45;
+        // Скролл камеры
+        if (player.y < canvas.height * 0.4) {
+            let diff = canvas.height * 0.4 - player.y;
+            player.y = canvas.height * 0.4;
 
             platforms.forEach(p => {
                 p.y += diff;
                 if (p.y > canvas.height) {
-                    // Переносим плиту наверх
-                    p.y = platforms.reduce((min, plat) => Math.min(min, plat.y), canvas.height) - 170;
-                    p.x = Math.random() * (canvas.width - 120);
-                    
-                    // Обновляем коин для этой плиты
+                    p.y = platforms.reduce((min, pl) => Math.min(min, pl.y), canvas.height) - 180;
+                    p.x = Math.random() * (canvas.width - 130);
+                    // Сбрасываем монету для этой платформы
                     let coin = coins.find(c => c.parent === p);
-                    if (coin) {
-                        coin.taken = false;
-                        coin.x = p.x + p.w / 2;
-                        coin.y = p.y - 30;
-                    } else if (Math.random() > 0.5) {
-                        // Если у плиты не было коина, можем создать новый
-                        coins.push({ x: p.x + p.w/2, y: p.y - 30, taken: false, parent: p });
-                    }
-                }
-            });
-
-            // Синхронизируем положение всех коинов с их плитами
-            coins.forEach(c => {
-                if (c.parent) {
-                    c.y = c.parent.y - 30;
-                    c.x = c.parent.x + c.parent.w / 2;
+                    if (coin) coin.taken = false;
                 }
             });
         }
@@ -176,41 +151,44 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Платформы (красивый цвет)
-        ctx.fillStyle = "#5dade2";
+        // Рисуем платформы
+        ctx.fillStyle = "#3498db";
         platforms.forEach(p => {
-            ctx.roundRect ? ctx.beginPath() : null; // Для красоты если браузер тянет
             ctx.fillRect(p.x, p.y, p.w, p.h);
         });
 
-        // Монеты
+        // Рисуем монеты над платформами
         ctx.fillStyle = "#f1c40f";
         coins.forEach(c => {
             if (!c.taken) {
+                let cx = c.parent.x + c.parent.w / 2;
+                let cy = c.parent.y - 30;
                 ctx.beginPath();
-                ctx.arc(c.x, c.y, 12, 0, Math.PI * 2);
+                ctx.arc(cx, cy, 12, 0, Math.PI * 2);
                 ctx.fill();
-                // Блик на монетке
-                ctx.fillStyle = "white";
+                // Блеск
+                ctx.fillStyle = "#fff";
                 ctx.beginPath();
-                ctx.arc(c.x - 4, c.y - 4, 3, 0, Math.PI * 2);
+                ctx.arc(cx - 4, cy - 4, 3, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = "#f1c40f";
             }
         });
 
-        // Марио
-        if (marioImg.complete) {
+        // Рисуем Марио (запасной вариант оранжевый цвет)
+        if (marioImg.complete && marioImg.naturalWidth !== 0) {
             ctx.drawImage(marioImg, player.x, player.y, player.w, player.h);
         } else {
-            ctx.fillStyle = "orange";
+            ctx.fillStyle = "#e67e22";
             ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.fillStyle = "#fff";
+            ctx.fillText("MARIO", player.x + 20, player.y + 35);
         }
     }
 
     function gameOver() {
         running = false;
-        document.getElementById("finalscore").innerText = `Всего баллов: ${score}`;
+        document.getElementById("finalscore").innerText = `Набрано монет: ${balance}`;
         document.getElementById("gameover").style.display = "flex";
     }
 
@@ -218,7 +196,6 @@
         score = 0; balance = 0;
         document.getElementById("hud").innerText = `Баллы: 0 | 💰 Монеты: 0`;
         document.getElementById("gameover").style.display = "none";
-        running = true;
         init();
     }
 
@@ -226,18 +203,14 @@
         tg.sendData(JSON.stringify({ score: score, balance: balance }));
     }
 
-    // Управление
-    const bL = document.getElementById("btnLeft");
-    const bR = document.getElementById("btnRight");
+    // Управление без лагов
+    const handleMove = (dir) => { player.vx = dir * 7; };
+    const handleStop = () => { player.vx = 0; };
 
-    const startLeft = (e) => { e.preventDefault(); player.vx = -7; };
-    const startRight = (e) => { e.preventDefault(); player.vx = 7; };
-    const stop = (e) => { e.preventDefault(); player.vx = 0; };
-
-    bL.addEventListener("touchstart", startLeft);
-    bR.addEventListener("touchstart", startRight);
-    bL.addEventListener("touchend", stop);
-    bR.addEventListener("touchend", stop);
+    document.getElementById("btnLeft").addEventListener("touchstart", (e) => { e.preventDefault(); handleMove(-1); });
+    document.getElementById("btnRight").addEventListener("touchstart", (e) => { e.preventDefault(); handleMove(1); });
+    document.getElementById("btnLeft").addEventListener("touchend", handleStop);
+    document.getElementById("btnRight").addEventListener("touchend", handleStop);
 
     function loop() {
         update();
@@ -245,8 +218,10 @@
         requestAnimationFrame(loop);
     }
 
-    init();
-    loop();
+    window.onload = () => {
+        init();
+        loop();
+    };
 </script>
 </body>
 </html>

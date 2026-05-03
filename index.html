@@ -1,183 +1,266 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TTK Jump Stable</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        html, body { margin: 0; padding: 0; overflow: hidden; background: #000; touch-action: none; }
-        canvas { display: block; background: #222 url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover; }
-        #hud { position: fixed; top: 10px; left: 10px; color: #fff; font-family: sans-serif; font-weight: bold; z-index: 5; pointer-events: none; }
-        #gameover { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); flex-direction: column; align-items: center; justify-content: center; color: #fff; z-index: 100; font-family: sans-serif; }
-        .btn { padding: 12px 25px; border-radius: 20px; border: none; font-weight: bold; margin: 10px; font-size: 16px; }
-        #controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; box-sizing: border-box; z-index: 10; }
-        .ctrl-btn { width: 80px; height: 80px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; user-select: none; -webkit-user-select: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TTK Jump Stable</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+html, body { margin: 0; padding: 0; overflow: hidden; background: #000; touch-action: none; }
+canvas { display: block; background: #222 url("https://i.pinimg.com/originals/4e/de/5a/4ede5a33c5490195b2b17466ad26d124.gif") center/cover; }
+
+#hud {
+position: fixed;
+top: 10px;
+left: 10px;
+color: #fff;
+font-family: sans-serif;
+font-weight: bold;
+z-index: 5;
+pointer-events: none;
+}
+
+/* =========================
+📋 НОВАЯ КНОПКА СТАТУСА
+========================= */
+#statusBtn {
+position: fixed;
+top: 10px;
+right: 10px;
+z-index: 10;
+padding: 10px 14px;
+border-radius: 12px;
+border: none;
+background: #2196F3;
+color: white;
+font-weight: bold;
+}
+
+#gameover {
+display: none;
+position: fixed;
+inset: 0;
+background: rgba(0,0,0,0.8);
+flex-direction: column;
+align-items: center;
+justify-content: center;
+color: #fff;
+z-index: 100;
+font-family: sans-serif;
+}
+
+.btn {
+padding: 12px 25px;
+border-radius: 20px;
+border: none;
+font-weight: bold;
+margin: 10px;
+font-size: 16px;
+}
+
+#controls {
+position: fixed;
+bottom: 30px;
+width: 100%;
+display: flex;
+justify-content: space-between;
+padding: 0 40px;
+box-sizing: border-box;
+z-index: 10;
+}
+
+.ctrl-btn {
+width: 80px;
+height: 80px;
+background: rgba(255,255,255,0.2);
+border-radius: 50%;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 30px;
+color: white;
+user-select: none;
+}
+</style>
 </head>
+
 <body>
 
 <div id="hud">Баллы: 0 | 💰 Монеты: 0</div>
 
+<!-- =========================
+📋 КНОПКА СТАТУСА ЗАЯВОК
+========================= -->
+<button id="statusBtn" onclick="checkStatus()">📋 Статус</button>
+
 <div id="gameover">
-    <h1>GAME OVER</h1>
-    <p id="res"></p>
-    <button class="btn" style="background:#4CAF50; color:white;" onclick="restart()">ЕЩЕ РАЗ</button>
-    <button class="btn" style="background:#2196F3; color:white;" onclick="exitGame()">В БОТ</button>
+<h1>GAME OVER</h1>
+<p id="res"></p>
+<button class="btn" style="background:#4CAF50; color:white;" onclick="restart()">ЕЩЕ РАЗ</button>
+<button class="btn" style="background:#2196F3; color:white;" onclick="exitGame()">В БОТ</button>
 </div>
 
 <div id="controls">
-    <div class="ctrl-btn" id="l">◀</div>
-    <div class="ctrl-btn" id="r">▶</div>
+<div class="ctrl-btn" id="l">◀</div>
+<div class="ctrl-btn" id="r">▶</div>
 </div>
 
 <canvas id="g"></canvas>
 
 <script>
-    const canvas = document.getElementById("g");
-    const ctx = canvas.getContext("2d");
-    const tg = window.Telegram.WebApp;
-    tg.expand();
+const canvas = document.getElementById("g");
+const ctx = canvas.getContext("2d");
+const tg = window.Telegram.WebApp;
+tg.expand();
 
-    let score = 0, balance = 0, running = true;
-    const gravity = 0.4, jump = -13;
+let score = 0, balance = 0, running = true;
+const gravity = 0.4, jump = -13;
 
-    // ПЕРСОНАЖ (Широкий Марио)
-    const p = { x: 0, y: 0, vx: 0, vy: 0, w: 80, h: 60 };
-    const img = new Image();
-    img.src = "mario.png";
+const p = { x: 0, y: 0, vx: 0, vy: 0, w: 80, h: 60 };
+const img = new Image();
+img.src = "mario.png";
 
-    let platforms = [], coins = [];
+let platforms = [], coins = [];
 
-    function init() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        p.x = canvas.width / 2 - 40;
-        p.y = canvas.height - 150;
-        p.vx = 0; p.vy = 0;
-        score = 0; balance = 0;
-        
-        platforms = [];
-        coins = [];
-        
-        // Первая плита
-        platforms.push({ x: canvas.width/2 - 75, y: canvas.height - 50, w: 150, h: 15 });
-        
-        let py = canvas.height - 50;
-        for(let i=0; i<7; i++) {
-            py -= 160;
-            spawn(py);
-        }
-    }
+function init() {
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-    function spawn(y) {
-        let w = 120;
-        let x = Math.random() * (canvas.width - w);
-        let plat = { x: x, y: y, w: w, h: 15 };
-        platforms.push(plat);
-        if(Math.random() > 0.4) coins.push({ parent: plat, taken: false });
-    }
+p.x = canvas.width / 2 - 40;
+p.y = canvas.height - 150;
+p.vx = 0; p.vy = 0;
 
-    function update() {
-        if(!running) return;
+score = 0; balance = 0;
 
-        p.vy += gravity;
-        p.y += p.vy;
-        p.x += p.vx;
+platforms = [];
+coins = [];
 
-        // Края
-        if(p.x + p.w < 0) p.x = canvas.width;
-        if(p.x > canvas.width) p.x = -p.w;
+platforms.push({ x: canvas.width/2 - 75, y: canvas.height - 50, w: 150, h: 15 });
 
-        // Прыжки
-        if(p.vy > 0) {
-            platforms.forEach(plt => {
-                if(p.y + p.h > plt.y && p.y + p.h < plt.y + 20 && p.x + p.w > plt.x && p.x < plt.x + plt.w) {
-                    p.vy = jump;
-                }
-            });
-        }
+let py = canvas.height - 50;
+for(let i=0; i<7; i++) {
+py -= 160;
+spawn(py);
+}
+}
 
-        // Монеты
-        coins.forEach(c => {
-            if(!c.taken) {
-                let cx = c.parent.x + c.parent.w/2;
-                let cy = c.parent.y - 25;
-                if(Math.abs(p.x + p.w/2 - cx) < 40 && Math.abs(p.y + p.h/2 - cy) < 40) {
-                    c.taken = true; balance++; score += 10;
-                    document.getElementById("hud").innerText = `Баллы: ${score} | 💰 Монеты: ${balance}`;
-                }
-            }
-        });
+function spawn(y) {
+let w = 120;
+let x = Math.random() * (canvas.width - w);
+let plat = { x: x, y: y, w: w, h: 15 };
+platforms.push(plat);
+if(Math.random() > 0.4) coins.push({ parent: plat, taken: false });
+}
 
-        // Скролл
-        if(p.y < canvas.height/2) {
-            let d = canvas.height/2 - p.y;
-            p.y = canvas.height/2;
-            platforms.forEach(plt => {
-                plt.y += d;
-                if(plt.y > canvas.height) {
-                    plt.y = platforms.reduce((m, x) => Math.min(m, x.y), canvas.height) - 160;
-                    plt.x = Math.random() * (canvas.width - 120);
-                    let c = coins.find(x => x.parent === plt);
-                    if(c) c.taken = false;
-                }
-            });
-        }
+function update() {
+if(!running) return;
 
-        if(p.y > canvas.height + 50) { running = false; showOver(); }
-    }
+p.vy += gravity;
+p.y += p.vy;
+p.x += p.vx;
 
-    function draw() {
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.fillStyle = "#3498db";
-        platforms.forEach(plt => ctx.fillRect(plt.x, plt.y, plt.w, plt.h));
-        
-        ctx.fillStyle = "gold";
-        coins.forEach(c => {
-            if(!c.taken) {
-                ctx.beginPath();
-                ctx.arc(c.parent.x + c.parent.w/2, c.parent.y - 25, 10, 0, Math.PI*2);
-                ctx.fill();
-            }
-        });
+if(p.x + p.w < 0) p.x = canvas.width;
+if(p.x > canvas.width) p.x = -p.w;
 
-        if(img.complete) ctx.drawImage(img, p.x, p.y, p.w, p.h);
-        else { ctx.fillStyle = "red"; ctx.fillRect(p.x, p.y, p.w, p.h); }
-    }
+if(p.vy > 0) {
+platforms.forEach(plt => {
+if(p.y + p.h > plt.y && p.y + p.h < plt.y + 20 && p.x + p.w > plt.x && p.x < plt.x + plt.w) {
+p.vy = jump;
+}
+});
+}
 
-    function showOver() {
-        document.getElementById("res").innerText = `Собрано: ${balance} 💰`;
-        document.getElementById("gameover").style.display = "flex";
-    }
+coins.forEach(c => {
+if(!c.taken) {
+let cx = c.parent.x + c.parent.w/2;
+let cy = c.parent.y - 25;
 
-    function restart() {
-        document.getElementById("gameover").style.display = "none";
-        init(); running = true;
-    }
+if(Math.abs(p.x + p.w/2 - cx) < 40 && Math.abs(p.y + p.h/2 - cy) < 40) {
+c.taken = true;
+balance++; score += 10;
 
-    function exitGame() {
-        tg.sendData(JSON.stringify({balance: balance}));
-    }
+document.getElementById("hud").innerText =
+`Баллы: ${score} | 💰 Монеты: ${balance}`;
+}
+}
+});
 
-    // --- УПРАВЛЕНИЕ (ИСПРАВЛЕНО) ---
-    const l = document.getElementById("l"), r = document.getElementById("r");
-    
-    // Для мобильных
-    l.addEventListener("touchstart", (e) => { e.preventDefault(); p.vx = -7; });
-    l.addEventListener("touchend", (e) => { e.preventDefault(); p.vx = 0; });
-    r.addEventListener("touchstart", (e) => { e.preventDefault(); p.vx = 7; });
-    r.addEventListener("touchend", (e) => { e.preventDefault(); p.vx = 0; });
+if(p.y < canvas.height/2) {
+let d = canvas.height/2 - p.y;
+p.y = canvas.height/2;
 
-    // Для клавиатуры (тест)
-    window.addEventListener("keydown", (e) => {
-        if(e.key === "ArrowLeft") p.vx = -7;
-        if(e.key === "ArrowRight") p.vx = 7;
-    });
-    window.addEventListener("keyup", () => p.vx = 0);
+platforms.forEach(plt => {
+plt.y += d;
+if(plt.y > canvas.height) {
+plt.y = platforms.reduce((m, x) => Math.min(m, x.y), canvas.height) - 160;
+plt.x = Math.random() * (canvas.width - 120);
+}
+});
+}
 
-    function loop() { update(); draw(); requestAnimationFrame(loop); }
-    init(); loop();
+if(p.y > canvas.height + 50) { running = false; showOver(); }
+}
+
+function draw() {
+ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.fillStyle = "#3498db";
+platforms.forEach(plt => ctx.fillRect(plt.x, plt.y, plt.w, plt.h));
+
+ctx.fillStyle = "gold";
+coins.forEach(c => {
+if(!c.taken) {
+ctx.beginPath();
+ctx.arc(c.parent.x + c.parent.w/2, c.parent.y - 25, 10, 0, Math.PI*2);
+ctx.fill();
+}
+});
+
+if(img.complete) ctx.drawImage(img, p.x, p.y, p.w, p.h);
+else { ctx.fillStyle = "red"; ctx.fillRect(p.x, p.y, p.w, p.h); }
+}
+
+function showOver() {
+document.getElementById("res").innerText = `Собрано: ${balance} 💰`;
+document.getElementById("gameover").style.display = "flex";
+}
+
+function restart() {
+document.getElementById("gameover").style.display = "none";
+init(); running = true;
+}
+
+function exitGame() {
+tg.sendData(JSON.stringify({balance: balance}));
+}
+
+/* =========================
+📋 НОВАЯ ФУНКЦИЯ СТАТУСА
+========================= */
+function checkStatus() {
+tg.sendData(JSON.stringify({
+action: "check_status"
+}));
+alert("📋 Запрос статуса отправлен в бот");
+}
+
+const l = document.getElementById("l"), r = document.getElementById("r");
+
+l.addEventListener("touchstart", (e) => { e.preventDefault(); p.vx = -7; });
+l.addEventListener("touchend", (e) => { e.preventDefault(); p.vx = 0; });
+r.addEventListener("touchstart", (e) => { e.preventDefault(); p.vx = 7; });
+r.addEventListener("touchend", (e) => { e.preventDefault(); p.vx = 0; });
+
+window.addEventListener("keydown", (e) => {
+if(e.key === "ArrowLeft") p.vx = -7;
+if(e.key === "ArrowRight") p.vx = 7;
+});
+window.addEventListener("keyup", () => p.vx = 0);
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+init(); loop();
 </script>
 </body>
 </html>
